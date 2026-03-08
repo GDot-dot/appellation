@@ -147,6 +147,7 @@ export default function App() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [showTree, setShowTree] = useState(false);
   const [inputMethod, setInputMethod] = useState<'buttons' | 'tree'>('buttons');
+  const [isTreeFullscreen, setIsTreeFullscreen] = useState(false);
 
   const getTaigiInfo = (mandarinTerm: string) => {
     return TAIGI_MAP[mandarinTerm] || null;
@@ -168,23 +169,29 @@ export default function App() {
     { id: '外祖母', label: '外媽', x: 85, y: 10, path: ['母', '母'], searchTerm: '外婆' },
     
     // 父輩 (y: 35)
-    { id: '叔伯', label: '叔/伯', x: 10, y: 35, path: ['父', '兄'], altPath: ['父', '弟'], searchTerm: '叔叔' },
-    { id: '姑姑', label: '姑姑', x: 20, y: 35, path: ['父', '姐'], altPath: ['父', '妹'], searchTerm: '姑姑' },
-    { id: '父', label: '爸爸', x: 35, y: 35, path: ['父'], searchTerm: '爸爸' },
-    { id: '母', label: '媽媽', x: 65, y: 35, path: ['母'], searchTerm: '媽媽' },
-    { id: '舅舅', label: '舅舅', x: 80, y: 35, path: ['母', '兄'], altPath: ['母', '弟'], searchTerm: '舅舅' },
-    { id: '姨媽', label: '阿姨', x: 90, y: 35, path: ['母', '姐'], altPath: ['母', '妹'], searchTerm: '阿姨' },
+    { id: '伯父', label: '伯伯', x: 5, y: 35, path: ['父', '兄'], searchTerm: '伯伯' },
+    { id: '叔叔', label: '叔叔', x: 13, y: 35, path: ['父', '弟'], searchTerm: '叔叔' },
+    { id: '姑媽', label: '姑媽', x: 21, y: 35, path: ['父', '姐'], searchTerm: '姑媽' },
+    { id: '姑姐', label: '姑姐', x: 29, y: 35, path: ['父', '妹'], searchTerm: '姑姑' },
+    { id: '父', label: '爸爸', x: 38, y: 35, path: ['父'], searchTerm: '爸爸' },
+    { id: '母', label: '媽媽', x: 62, y: 35, path: ['母'], searchTerm: '媽媽' },
+    { id: '大舅', label: '大舅', x: 71, y: 35, path: ['母', '兄'], searchTerm: '大舅' },
+    { id: '小舅', label: '小舅', x: 79, y: 35, path: ['母', '弟'], searchTerm: '小舅' },
+    { id: '姨媽', label: '姨媽', x: 87, y: 35, path: ['母', '姐'], searchTerm: '姨媽' },
+    { id: '阿姨', label: '阿姨', x: 95, y: 35, path: ['母', '妹'], searchTerm: '阿姨' },
 
     // 自己輩 (y: 60)
-    { id: '堂親', label: '堂親', x: 10, y: 60, path: ['父', '兄', '子'], altPath: ['父', '弟', '子'], extraPaths: [['父', '兄', '女'], ['父', '弟', '女']], searchTerm: '堂哥' },
-    { id: '表親1', label: '表親(姑)', x: 20, y: 60, path: ['父', '姐', '子'], altPath: ['父', '妹', '子'], extraPaths: [['父', '姐', '女'], ['父', '妹', '女']], searchTerm: '表哥' },
-    { id: '兄姐', label: '兄/姐', x: 32, y: 60, path: ['兄'], altPath: ['姐'], searchTerm: '哥哥' },
-    { id: '夫', label: '夫', x: 42, y: 60, path: ['夫'], searchTerm: '老公' },
+    { id: '堂親', label: '堂親', x: 9, y: 60, path: ['父', '兄', '子'], altPath: ['父', '弟', '子'], extraPaths: [['父', '兄', '女'], ['父', '弟', '女']], searchTerm: '堂哥' },
+    { id: '表親1', label: '表親(姑)', x: 25, y: 60, path: ['父', '姐', '子'], altPath: ['父', '妹', '子'], extraPaths: [['父', '姐', '女'], ['父', '妹', '女']], searchTerm: '表哥' },
+    { id: '哥哥', label: '哥哥', x: 33, y: 60, path: ['兄'], searchTerm: '哥哥' },
+    { id: '姐姐', label: '姐姐', x: 39, y: 60, path: ['姐'], searchTerm: '姐姐' },
+    { id: '夫', label: '夫', x: 45, y: 60, path: ['夫'], searchTerm: '老公' },
     { id: '我', label: '我', x: 50, y: 60, path: [], searchTerm: '' },
-    { id: '妻', label: '妻', x: 58, y: 60, path: ['妻'], searchTerm: '老婆' },
-    { id: '弟妹', label: '弟/妹', x: 68, y: 60, path: ['弟'], altPath: ['妹'], searchTerm: '弟弟' },
-    { id: '表親2', label: '表親(舅)', x: 80, y: 60, path: ['母', '兄', '子'], altPath: ['母', '弟', '子'], extraPaths: [['母', '兄', '女'], ['母', '弟', '女']], searchTerm: '表哥' },
-    { id: '表親3', label: '表親(姨)', x: 90, y: 60, path: ['母', '姐', '子'], altPath: ['母', '妹', '子'], extraPaths: [['母', '姐', '女'], ['母', '妹', '女']], searchTerm: '表哥' },
+    { id: '妻', label: '妻', x: 55, y: 60, path: ['妻'], searchTerm: '老婆' },
+    { id: '弟弟', label: '弟弟', x: 61, y: 60, path: ['弟'], searchTerm: '弟弟' },
+    { id: '妹妹', label: '妹妹', x: 67, y: 60, path: ['妹'], searchTerm: '妹妹' },
+    { id: '表親2', label: '表親(舅)', x: 75, y: 60, path: ['母', '兄', '子'], altPath: ['母', '弟', '子'], extraPaths: [['母', '兄', '女'], ['母', '弟', '女']], searchTerm: '表哥' },
+    { id: '表親3', label: '表親(姨)', x: 91, y: 60, path: ['母', '姐', '子'], altPath: ['母', '妹', '子'], extraPaths: [['母', '姐', '女'], ['母', '妹', '女']], searchTerm: '表哥' },
 
     // 子輩 (y: 85)
     { id: '姪子', label: '姪子/女', x: 35, y: 85, path: ['兄', '子'], altPath: ['弟', '子'], extraPaths: [['兄', '女'], ['弟', '女']], searchTerm: '姪子' },
@@ -196,25 +203,34 @@ export default function App() {
   // 定義節點間的連線
   const CONNECTIONS = [
     { from: '祖父', to: '父' }, { from: '祖母', to: '父' },
-    { from: '祖父', to: '叔伯' }, { from: '祖母', to: '叔伯' },
-    { from: '祖父', to: '姑姑' }, { from: '祖母', to: '姑姑' },
+    { from: '祖父', to: '伯父' }, { from: '祖母', to: '伯父' },
+    { from: '祖父', to: '叔叔' }, { from: '祖母', to: '叔叔' },
+    { from: '祖父', to: '姑媽' }, { from: '祖母', to: '姑媽' },
+    { from: '祖父', to: '姑姐' }, { from: '祖母', to: '姑姐' },
     { from: '外祖父', to: '母' }, { from: '外祖母', to: '母' },
-    { from: '外祖父', to: '舅舅' }, { from: '外祖母', to: '舅舅' },
+    { from: '外祖父', to: '大舅' }, { from: '外祖母', to: '大舅' },
+    { from: '外祖父', to: '小舅' }, { from: '外祖母', to: '小舅' },
     { from: '外祖父', to: '姨媽' }, { from: '外祖母', to: '姨媽' },
+    { from: '外祖父', to: '阿姨' }, { from: '外祖母', to: '阿姨' },
     { from: '父', to: '我' }, { from: '母', to: '我' },
     { from: '我', to: '父' }, { from: '我', to: '母' },
-    { from: '我', to: '兄姐' }, { from: '我', to: '弟妹' },
+    { from: '我', to: '哥哥' }, { from: '我', to: '姐姐' },
+    { from: '我', to: '弟弟' }, { from: '我', to: '妹妹' },
     { from: '我', to: '夫' }, { from: '我', to: '妻' },
-    { from: '父', to: '叔伯' }, { from: '父', to: '姑姑' },
-    { from: '母', to: '舅舅' }, { from: '母', to: '姨媽' },
-    { from: '父', to: '兄姐' }, { from: '母', to: '兄姐' },
-    { from: '父', to: '弟妹' }, { from: '母', to: '弟妹' },
-    { from: '叔伯', to: '堂親' },
-    { from: '姑姑', to: '表親1' },
-    { from: '舅舅', to: '表親2' },
-    { from: '姨媽', to: '表親3' },
-    { from: '兄姐', to: '姪子' },
-    { from: '弟妹', to: '姪子' },
+    { from: '父', to: '伯父' }, { from: '父', to: '叔叔' },
+    { from: '父', to: '姑媽' }, { from: '父', to: '姑姐' },
+    { from: '母', to: '大舅' }, { from: '母', to: '小舅' },
+    { from: '母', to: '姨媽' }, { from: '母', to: '阿姨' },
+    { from: '父', to: '哥哥' }, { from: '母', to: '哥哥' },
+    { from: '父', to: '姐姐' }, { from: '母', to: '姐姐' },
+    { from: '父', to: '弟弟' }, { from: '母', to: '弟弟' },
+    { from: '父', to: '妹妹' }, { from: '母', to: '妹妹' },
+    { from: '伯父', to: '堂親' }, { from: '叔叔', to: '堂親' },
+    { from: '姑媽', to: '表親1' }, { from: '姑姐', to: '表親1' },
+    { from: '大舅', to: '表親2' }, { from: '小舅', to: '表親2' },
+    { from: '姨媽', to: '表親3' }, { from: '阿姨', to: '表親3' },
+    { from: '哥哥', to: '姪子' }, { from: '弟弟', to: '姪子' },
+    { from: '姐姐', to: '外甥' }, { from: '妹妹', to: '外甥' },
     { from: '我', to: '子' },
     { from: '我', to: '女' },
   ];
@@ -308,14 +324,50 @@ export default function App() {
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="mt-6 p-4 bg-zinc-900 rounded-3xl border border-zinc-800 shadow-inner overflow-hidden relative min-h-[400px]"
+        className={`
+          ${isTreeFullscreen 
+            ? 'fixed inset-0 z-50 bg-zinc-950 p-6 flex flex-col' 
+            : 'mt-6 p-4 bg-zinc-900 rounded-3xl border border-zinc-800 shadow-inner relative min-h-[400px]'
+          }
+          overflow-hidden transition-all duration-500
+        `}
       >
-        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-          <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-          家族關係圖譜
+        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+            家族關係圖譜
+          </div>
+          <div className="flex gap-2">
+            {isTreeFullscreen && (
+              <div className="flex items-center gap-4 mr-4">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] text-zinc-400">目標</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-zinc-700" />
+                  <span className="text-[10px] text-zinc-400">路徑</span>
+                </div>
+              </div>
+            )}
+            <button 
+              onClick={() => setIsTreeFullscreen(!isTreeFullscreen)}
+              className={`p-2 rounded-lg transition-colors ${isTreeFullscreen ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'}`}
+              title={isTreeFullscreen ? "關閉全螢幕" : "全螢幕"}
+            >
+              {isTreeFullscreen ? (
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-xs font-bold">關閉圖譜</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </div>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+              )}
+            </button>
+          </div>
         </div>
 
-        <div className="relative w-full h-[350px]">
+        <div className={`relative w-full flex-1 ${isTreeFullscreen ? 'h-full' : 'h-[350px]'}`}>
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             {CONNECTIONS.map((conn, idx) => {
               const from = TREE_NODES.find(n => n.id === conn.from)!;
@@ -349,6 +401,7 @@ export default function App() {
                 active={isNodeActive(node)} 
                 target={isTargetNode(node)} 
                 onClick={() => handleNodeClick(node)}
+                isLarge={isTreeFullscreen}
               />
             </div>
           ))}
@@ -373,7 +426,7 @@ export default function App() {
     );
   };
 
-  const TreeNode = ({ node, active, target, onClick }: { node: any; active: boolean; target: boolean; onClick: () => void }) => (
+  const TreeNode = ({ node, active, target, onClick, isLarge }: { node: any; active: boolean; target: boolean; onClick: () => void; isLarge?: boolean }) => (
     <motion.div
       onClick={onClick}
       whileHover={{ scale: 1.05 }}
@@ -384,11 +437,12 @@ export default function App() {
         borderColor: target ? '#34d399' : active ? '#52525b' : '#27272a'
       }}
       className={`
-        w-10 h-10 rounded-xl border flex flex-col items-center justify-center transition-colors duration-300 cursor-pointer
+        ${isLarge ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'}
+        border flex flex-col items-center justify-center transition-all duration-300 cursor-pointer
         ${target ? 'text-white shadow-lg shadow-emerald-500/20' : active ? 'text-zinc-200' : 'text-zinc-600'}
       `}
     >
-      <span className="text-[8px] font-bold leading-none text-center px-1">{node.label}</span>
+      <span className={`${isLarge ? 'text-[10px]' : 'text-[8px]'} font-bold leading-none text-center px-1`}>{node.label}</span>
       {target && active && (
         <motion.div 
           initial={{ opacity: 0 }}
