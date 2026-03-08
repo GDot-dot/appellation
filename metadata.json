@@ -1,0 +1,5 @@
+{
+  "name": "台灣親戚稱呼計算器",
+  "description": "一個方便查詢台灣親戚稱謂的計算器，輸入關係鏈即可得知正確稱呼。",
+  "requestFramePermissions": []
+}

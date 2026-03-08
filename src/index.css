@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  @apply bg-zinc-50 text-zinc-900 antialiased;
+}
+
+.calculator-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
