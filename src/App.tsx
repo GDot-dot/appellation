@@ -192,25 +192,27 @@ const normalize = (s: string) => {
 const TreeNode = ({ node, active, target, onClick, isLarge }: { node: any; active: boolean; target: boolean; onClick: () => void; isLarge?: boolean }) => (
   <motion.div
     onClick={onClick}
-    whileHover={{ scale: 1.05 }}
-    whileTap={{ scale: 0.95 }}
+    whileHover={{ scale: 1.1, zIndex: 10 }}
+    whileTap={{ scale: 0.9 }}
     animate={{ 
-      scale: target ? 1.1 : 1,
+      scale: target ? 1.2 : 1,
       backgroundColor: target ? '#10b981' : active ? '#3f3f46' : '#18181b',
-      borderColor: target ? '#34d399' : active ? '#52525b' : '#27272a'
+      borderColor: target ? '#34d399' : active ? '#52525b' : '#27272a',
+      boxShadow: target ? '0 0 20px rgba(16, 185, 129, 0.4)' : 'none'
     }}
     className={`
-      ${isLarge ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'}
+      ${isLarge ? 'w-16 h-16 rounded-2xl' : 'w-12 h-12 rounded-xl'}
       border flex flex-col items-center justify-center transition-all duration-300 cursor-pointer
-      ${target ? 'text-white shadow-lg shadow-emerald-500/20' : active ? 'text-zinc-200' : 'text-zinc-600'}
+      ${target ? 'text-white' : active ? 'text-zinc-200' : 'text-zinc-600'}
+      select-none
     `}
   >
-    <span className={`${isLarge ? 'text-[10px]' : 'text-[8px]'} font-bold leading-none text-center px-1`}>{node.label}</span>
+    <span className={`${isLarge ? 'text-[11px]' : 'text-[9px]'} font-bold leading-tight text-center px-1`}>{node.label}</span>
     {target && active && (
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="w-0.5 h-0.5 rounded-full bg-white mt-0.5"
+        className="w-1 h-1 rounded-full bg-white mt-1"
       />
     )}
   </motion.div>
@@ -235,6 +237,9 @@ const FamilyTreeVisualizer = ({
   setQuery: (v: string | ((p: string) => string)) => void; 
   setShowTree: (v: boolean) => void; 
 }) => {
+  const [zoom, setZoom] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+
   if (!show) return null;
 
   const nQuery = normalize(query);
@@ -273,6 +278,7 @@ const FamilyTreeVisualizer = ({
   };
 
   const handleNodeClick = (node: any) => {
+    if (isDragging) return;
     if (mode === 'chain') {
       const path = node.path.join('的');
       if (path) {
@@ -296,6 +302,14 @@ const FamilyTreeVisualizer = ({
     return isNodeActive(fromNode) && isNodeActive(toNode);
   };
 
+  const handleZoom = (delta: number) => {
+    setZoom(prev => Math.min(Math.max(prev + delta, 0.5), 3));
+  };
+
+  const resetView = () => {
+    setZoom(1);
+  };
+
   return (
     <>
       {/* Placeholder to prevent layout jump when going fullscreen */}
@@ -314,12 +328,36 @@ const FamilyTreeVisualizer = ({
           overflow-hidden
         `}
       >
-        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
             家族關係圖譜
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <div className="flex bg-zinc-800 rounded-lg overflow-hidden mr-2">
+              <button 
+                onClick={() => handleZoom(0.2)}
+                className="p-2 hover:bg-zinc-700 text-zinc-400 transition-colors border-r border-zinc-700"
+                title="放大"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </button>
+              <button 
+                onClick={() => handleZoom(-0.2)}
+                className="p-2 hover:bg-zinc-700 text-zinc-400 transition-colors border-r border-zinc-700"
+                title="縮小"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+              </button>
+              <button 
+                onClick={resetView}
+                className="p-2 hover:bg-zinc-700 text-zinc-400 transition-colors"
+                title="重置視角"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
+
             {isTreeFullscreen && (
               <div className="flex items-center gap-4 mr-4">
                 <div className="flex items-center gap-1">
@@ -355,48 +393,58 @@ const FamilyTreeVisualizer = ({
           </div>
         </div>
 
-        <div className={`relative w-full flex-1 ${isTreeFullscreen ? 'h-full' : 'h-[350px]'}`}>
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-            {CONNECTIONS.map((conn, idx) => {
-              const from = TREE_NODES.find(n => n.id === conn.from)!;
-              const to = TREE_NODES.find(n => n.id === conn.to)!;
-              const active = isConnectionActive(conn.from, conn.to);
-              return (
-                <motion.line
-                  key={idx}
-                  x1={`${from.x}%`}
-                  y1={`${from.y}%`}
-                  x2={`${to.x}%`}
-                  y2={`${to.y}%`}
-                  stroke={active ? '#10b981' : '#27272a'}
-                  strokeWidth={active ? 2 : 1}
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.5 }}
-                />
-              );
-            })}
-          </svg>
+        <div className={`relative w-full flex-1 cursor-grab active:cursor-grabbing ${isTreeFullscreen ? 'h-full' : 'h-[350px]'}`}>
+          <motion.div 
+            drag
+            dragConstraints={{ left: -500, right: 500, top: -500, bottom: 500 }}
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={() => setTimeout(() => setIsDragging(false), 50)}
+            animate={{ scale: zoom }}
+            className="w-full h-full relative origin-center"
+          >
+            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+              {CONNECTIONS.map((conn, idx) => {
+                const from = TREE_NODES.find(n => n.id === conn.from)!;
+                const to = TREE_NODES.find(n => n.id === conn.to)!;
+                const active = isConnectionActive(conn.from, conn.to);
+                return (
+                  <motion.line
+                    key={idx}
+                    x1={`${from.x}%`}
+                    y1={`${from.y}%`}
+                    x2={`${to.x}%`}
+                    y2={`${to.y}%`}
+                    stroke={active ? '#10b981' : '#3f3f46'}
+                    strokeWidth={active ? 2 : 1}
+                    strokeOpacity={active ? 1 : 0.3}
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.5 }}
+                  />
+                );
+              })}
+            </svg>
 
-          {TREE_NODES.map((node) => (
-            <div 
-              key={node.id}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${node.x}%`, top: `${node.y}%` }}
-            >
-              <TreeNode 
-                node={node} 
-                active={isNodeActive(node)} 
-                target={isTargetNode(node)} 
-                onClick={() => handleNodeClick(node)}
-                isLarge={isTreeFullscreen}
-              />
-            </div>
-          ))}
+            {TREE_NODES.map((node) => (
+              <div 
+                key={node.id}
+                className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${node.x}%`, top: `${node.y}%` }}
+              >
+                <TreeNode 
+                  node={node} 
+                  active={isNodeActive(node)} 
+                  target={isTargetNode(node)} 
+                  onClick={() => handleNodeClick(node)}
+                  isLarge={isTreeFullscreen}
+                />
+              </div>
+            ))}
+          </motion.div>
         </div>
 
         {!isTreeFullscreen && (
-          <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between items-center">
+          <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between items-center z-10">
             <div className="text-[9px] text-zinc-500 max-w-[60%] truncate">
               {query || '選擇關係開始'}
             </div>
