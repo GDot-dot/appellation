@@ -95,241 +95,223 @@ const TAIGI_MAP: Record<string, { term: string; pinyin: string }> = {
   '小姨子': { term: '姨仔', pinyin: 'î-á' },
 };
 
-export default function App() {
-  const [query, setQuery] = useState<string>('');
-  const [result, setResult] = useState<string[]>([]);
-  const [gender, setGender] = useState<Gender>(1); // Default to male speaker
-  const [mode, setMode] = useState<'chain' | 'reverse'>('chain'); // chain: A的B, reverse: 稱呼A為什麼
-  const [showTaigi, setShowTaigi] = useState<boolean>(true);
 
-  const handleAddRelation = (val: string) => {
-    setQuery(prev => prev ? `${prev}的${val}` : val);
-  };
+// Helper components and constants remain outside
 
-  const handleClear = () => {
-    setQuery('');
-    setResult([]);
-  };
+// 定義家族地圖的節點與座標 (x: 0-100, y: 0-100)
+const TREE_NODES = [
+  // 祖輩 (y: 10)
+  { id: '祖父', label: '祖父', x: 15, y: 10, path: ['父', '父'], searchTerm: '祖父' },
+  { id: '祖母', label: '祖母', x: 25, y: 10, path: ['父', '母'], searchTerm: '祖母' },
+  { id: '外祖父', label: '外公', x: 75, y: 10, path: ['母', '父'], searchTerm: '外公' },
+  { id: '外祖母', label: '外媽', x: 85, y: 10, path: ['母', '母'], searchTerm: '外婆' },
+  
+  // 父輩 (y: 35)
+  { id: '伯父', label: '伯伯', x: 5, y: 35, path: ['父', '兄'], searchTerm: '伯伯' },
+  { id: '叔叔', label: '叔叔', x: 13, y: 35, path: ['父', '弟'], searchTerm: '叔叔' },
+  { id: '姑媽', label: '姑媽', x: 21, y: 35, path: ['父', '姐'], searchTerm: '姑媽' },
+  { id: '姑姐', label: '姑姐', x: 29, y: 35, path: ['父', '妹'], searchTerm: '姑姑' },
+  { id: '父', label: '爸爸', x: 38, y: 35, path: ['父'], searchTerm: '爸爸' },
+  { id: '母', label: '媽媽', x: 62, y: 35, path: ['母'], searchTerm: '媽媽' },
+  { id: '大舅', label: '大舅', x: 71, y: 35, path: ['母', '兄'], searchTerm: '大舅' },
+  { id: '小舅', label: '小舅', x: 79, y: 35, path: ['母', '弟'], searchTerm: '小舅' },
+  { id: '姨媽', label: '姨媽', x: 87, y: 35, path: ['母', '姐'], searchTerm: '姨媽' },
+  { id: '阿姨', label: '阿姨', x: 95, y: 35, path: ['母', '妹'], searchTerm: '阿姨' },
 
-  const handleBackspace = () => {
-    if (!query) return;
-    const parts = query.split('的');
-    parts.pop();
-    setQuery(parts.join('的'));
-  };
+  // 自己輩 (y: 60)
+  { id: '堂親', label: '堂親', x: 9, y: 60, path: ['父', '兄', '子'], altPath: ['父', '弟', '子'], extraPaths: [['父', '兄', '女'], ['父', '弟', '女']], searchTerm: '堂哥' },
+  { id: '表親1', label: '表親(姑)', x: 25, y: 60, path: ['父', '姐', '子'], altPath: ['父', '妹', '子'], extraPaths: [['父', '姐', '女'], ['父', '妹', '女']], searchTerm: '表哥' },
+  { id: '哥哥', label: '哥哥', x: 33, y: 60, path: ['兄'], searchTerm: '哥哥' },
+  { id: '姐姐', label: '姐姐', x: 39, y: 60, path: ['姐'], searchTerm: '姐姐' },
+  { id: '夫', label: '夫', x: 45, y: 60, path: ['夫'], searchTerm: '老公' },
+  { id: '我', label: '我', x: 50, y: 60, path: [], searchTerm: '' },
+  { id: '妻', label: '妻', x: 55, y: 60, path: ['妻'], searchTerm: '老婆' },
+  { id: '弟弟', label: '弟弟', x: 61, y: 60, path: ['弟'], searchTerm: '弟弟' },
+  { id: '妹妹', label: '妹妹', x: 67, y: 60, path: ['妹'], searchTerm: '妹妹' },
+  { id: '表親2', label: '表親(舅)', x: 75, y: 60, path: ['母', '兄', '子'], altPath: ['母', '弟', '子'], extraPaths: [['母', '兄', '女'], ['母', '弟', '女']], searchTerm: '表哥' },
+  { id: '表親3', label: '表親(姨)', x: 91, y: 60, path: ['母', '姐', '子'], altPath: ['母', '妹', '子'], extraPaths: [['母', '姐', '女'], ['母', '妹', '女']], searchTerm: '表哥' },
 
-  useEffect(() => {
-    if (!query) {
-      setResult([]);
-      return;
-    }
+  // 子輩 (y: 85)
+  { id: '姪子', label: '姪子/女', x: 35, y: 85, path: ['兄', '子'], altPath: ['弟', '子'], extraPaths: [['兄', '女'], ['弟', '女']], searchTerm: '姪子' },
+  { id: '子', label: '兒子', x: 45, y: 85, path: ['子'], searchTerm: '兒子' },
+  { id: '女', label: '女兒', x: 55, y: 85, path: ['女'], searchTerm: '女兒' },
+  { id: '外甥', label: '外甥/女', x: 65, y: 85, path: ['姐', '子'], altPath: ['妹', '子'], extraPaths: [['姐', '女'], ['妹', '女']], searchTerm: '外甥' },
+];
 
-    try {
-      const options = {
-        text: query,
-        sex: gender,
-        reverse: mode === 'reverse',
-        type: mode === 'chain' ? 'default' : 'chain'
-      };
-      const res = relationship(options);
-      if (Array.isArray(res)) {
-        setResult(res);
-      } else if (res) {
-        setResult([res]);
-      } else {
-        setResult([]);
-      }
-    } catch (e) {
-      setResult(['計算錯誤']);
-    }
-  }, [query, gender, mode]);
+// 定義節點間的連線
+const CONNECTIONS = [
+  { from: '祖父', to: '父' }, { from: '祖母', to: '父' },
+  { from: '祖父', to: '伯父' }, { from: '祖母', to: '伯父' },
+  { from: '祖父', to: '叔叔' }, { from: '祖母', to: '叔叔' },
+  { from: '祖父', to: '姑媽' }, { from: '祖母', to: '姑媽' },
+  { from: '祖父', to: '姑姐' }, { from: '祖母', to: '姑姐' },
+  { from: '外祖父', to: '母' }, { from: '外祖母', to: '母' },
+  { from: '外祖父', to: '大舅' }, { from: '外祖母', to: '大舅' },
+  { from: '外祖父', to: '小舅' }, { from: '外祖母', to: '小舅' },
+  { from: '外祖父', to: '姨媽' }, { from: '外祖母', to: '姨媽' },
+  { from: '外祖父', to: '阿姨' }, { from: '外祖母', to: '阿姨' },
+  { from: '父', to: '我' }, { from: '母', to: '我' },
+  { from: '我', to: '父' }, { from: '我', to: '母' },
+  { from: '我', to: '哥哥' }, { from: '我', to: '姐姐' },
+  { from: '我', to: '弟弟' }, { from: '我', to: '妹妹' },
+  { from: '我', to: '夫' }, { from: '我', to: '妻' },
+  { from: '父', to: '伯父' }, { from: '父', to: '叔叔' },
+  { from: '父', to: '姑媽' }, { from: '父', to: '姑姐' },
+  { from: '母', to: '大舅' }, { from: '母', to: '小舅' },
+  { from: '母', to: '姨媽' }, { from: '母', to: '阿姨' },
+  { from: '父', to: '哥哥' }, { from: '母', to: '哥哥' },
+  { from: '父', to: '姐姐' }, { from: '母', to: '姐姐' },
+  { from: '父', to: '弟弟' }, { from: '母', to: '弟弟' },
+  { from: '父', to: '妹妹' }, { from: '母', to: '妹妹' },
+  { from: '伯父', to: '堂親' }, { from: '叔叔', to: '堂親' },
+  { from: '姑媽', to: '表親1' }, { from: '姑姐', to: '表親1' },
+  { from: '大舅', to: '表親2' }, { from: '小舅', to: '表親2' },
+  { from: '姨媽', to: '表親3' }, { from: '阿姨', to: '表親3' },
+  { from: '哥哥', to: '姪子' }, { from: '弟弟', to: '姪子' },
+  { from: '姐姐', to: '外甥' }, { from: '妹妹', to: '外甥' },
+  { from: '我', to: '子' },
+  { from: '我', to: '女' },
+];
 
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [showTree, setShowTree] = useState(false);
-  const [inputMethod, setInputMethod] = useState<'buttons' | 'tree'>('buttons');
-  const [isTreeFullscreen, setIsTreeFullscreen] = useState(false);
+const normalize = (s: string) => {
+  if (!s) return '';
+  return s
+    .replace(/爸爸/g, '父')
+    .replace(/媽媽/g, '母')
+    .replace(/哥哥/g, '兄')
+    .replace(/姐姐/g, '姐')
+    .replace(/姊姊/g, '姐')
+    .replace(/弟弟/g, '弟')
+    .replace(/妹妹/g, '妹')
+    .replace(/兒子/g, '子')
+    .replace(/女兒/g, '女')
+    .replace(/老婆/g, '妻')
+    .replace(/老公/g, '夫');
+};
 
-  const getTaigiInfo = (mandarinTerm: string) => {
-    return TAIGI_MAP[mandarinTerm] || null;
-  };
-
-  const handleCalculate = () => {
-    if (result.length === 0) return;
-    setIsCalculating(true);
-    setShowTree(true);
-    setTimeout(() => setIsCalculating(false), 300);
-  };
-
-  // 定義家族地圖的節點與座標 (x: 0-100, y: 0-100)
-  const TREE_NODES = [
-    // 祖輩 (y: 10)
-    { id: '祖父', label: '祖父', x: 15, y: 10, path: ['父', '父'], searchTerm: '祖父' },
-    { id: '祖母', label: '祖母', x: 25, y: 10, path: ['父', '母'], searchTerm: '祖母' },
-    { id: '外祖父', label: '外公', x: 75, y: 10, path: ['母', '父'], searchTerm: '外公' },
-    { id: '外祖母', label: '外媽', x: 85, y: 10, path: ['母', '母'], searchTerm: '外婆' },
-    
-    // 父輩 (y: 35)
-    { id: '伯父', label: '伯伯', x: 5, y: 35, path: ['父', '兄'], searchTerm: '伯伯' },
-    { id: '叔叔', label: '叔叔', x: 13, y: 35, path: ['父', '弟'], searchTerm: '叔叔' },
-    { id: '姑媽', label: '姑媽', x: 21, y: 35, path: ['父', '姐'], searchTerm: '姑媽' },
-    { id: '姑姐', label: '姑姐', x: 29, y: 35, path: ['父', '妹'], searchTerm: '姑姑' },
-    { id: '父', label: '爸爸', x: 38, y: 35, path: ['父'], searchTerm: '爸爸' },
-    { id: '母', label: '媽媽', x: 62, y: 35, path: ['母'], searchTerm: '媽媽' },
-    { id: '大舅', label: '大舅', x: 71, y: 35, path: ['母', '兄'], searchTerm: '大舅' },
-    { id: '小舅', label: '小舅', x: 79, y: 35, path: ['母', '弟'], searchTerm: '小舅' },
-    { id: '姨媽', label: '姨媽', x: 87, y: 35, path: ['母', '姐'], searchTerm: '姨媽' },
-    { id: '阿姨', label: '阿姨', x: 95, y: 35, path: ['母', '妹'], searchTerm: '阿姨' },
-
-    // 自己輩 (y: 60)
-    { id: '堂親', label: '堂親', x: 9, y: 60, path: ['父', '兄', '子'], altPath: ['父', '弟', '子'], extraPaths: [['父', '兄', '女'], ['父', '弟', '女']], searchTerm: '堂哥' },
-    { id: '表親1', label: '表親(姑)', x: 25, y: 60, path: ['父', '姐', '子'], altPath: ['父', '妹', '子'], extraPaths: [['父', '姐', '女'], ['父', '妹', '女']], searchTerm: '表哥' },
-    { id: '哥哥', label: '哥哥', x: 33, y: 60, path: ['兄'], searchTerm: '哥哥' },
-    { id: '姐姐', label: '姐姐', x: 39, y: 60, path: ['姐'], searchTerm: '姐姐' },
-    { id: '夫', label: '夫', x: 45, y: 60, path: ['夫'], searchTerm: '老公' },
-    { id: '我', label: '我', x: 50, y: 60, path: [], searchTerm: '' },
-    { id: '妻', label: '妻', x: 55, y: 60, path: ['妻'], searchTerm: '老婆' },
-    { id: '弟弟', label: '弟弟', x: 61, y: 60, path: ['弟'], searchTerm: '弟弟' },
-    { id: '妹妹', label: '妹妹', x: 67, y: 60, path: ['妹'], searchTerm: '妹妹' },
-    { id: '表親2', label: '表親(舅)', x: 75, y: 60, path: ['母', '兄', '子'], altPath: ['母', '弟', '子'], extraPaths: [['母', '兄', '女'], ['母', '弟', '女']], searchTerm: '表哥' },
-    { id: '表親3', label: '表親(姨)', x: 91, y: 60, path: ['母', '姐', '子'], altPath: ['母', '妹', '子'], extraPaths: [['母', '姐', '女'], ['母', '妹', '女']], searchTerm: '表哥' },
-
-    // 子輩 (y: 85)
-    { id: '姪子', label: '姪子/女', x: 35, y: 85, path: ['兄', '子'], altPath: ['弟', '子'], extraPaths: [['兄', '女'], ['弟', '女']], searchTerm: '姪子' },
-    { id: '子', label: '兒子', x: 45, y: 85, path: ['子'], searchTerm: '兒子' },
-    { id: '女', label: '女兒', x: 55, y: 85, path: ['女'], searchTerm: '女兒' },
-    { id: '外甥', label: '外甥/女', x: 65, y: 85, path: ['姐', '子'], altPath: ['妹', '子'], extraPaths: [['姐', '女'], ['妹', '女']], searchTerm: '外甥' },
-  ];
-
-  // 定義節點間的連線
-  const CONNECTIONS = [
-    { from: '祖父', to: '父' }, { from: '祖母', to: '父' },
-    { from: '祖父', to: '伯父' }, { from: '祖母', to: '伯父' },
-    { from: '祖父', to: '叔叔' }, { from: '祖母', to: '叔叔' },
-    { from: '祖父', to: '姑媽' }, { from: '祖母', to: '姑媽' },
-    { from: '祖父', to: '姑姐' }, { from: '祖母', to: '姑姐' },
-    { from: '外祖父', to: '母' }, { from: '外祖母', to: '母' },
-    { from: '外祖父', to: '大舅' }, { from: '外祖母', to: '大舅' },
-    { from: '外祖父', to: '小舅' }, { from: '外祖母', to: '小舅' },
-    { from: '外祖父', to: '姨媽' }, { from: '外祖母', to: '姨媽' },
-    { from: '外祖父', to: '阿姨' }, { from: '外祖母', to: '阿姨' },
-    { from: '父', to: '我' }, { from: '母', to: '我' },
-    { from: '我', to: '父' }, { from: '我', to: '母' },
-    { from: '我', to: '哥哥' }, { from: '我', to: '姐姐' },
-    { from: '我', to: '弟弟' }, { from: '我', to: '妹妹' },
-    { from: '我', to: '夫' }, { from: '我', to: '妻' },
-    { from: '父', to: '伯父' }, { from: '父', to: '叔叔' },
-    { from: '父', to: '姑媽' }, { from: '父', to: '姑姐' },
-    { from: '母', to: '大舅' }, { from: '母', to: '小舅' },
-    { from: '母', to: '姨媽' }, { from: '母', to: '阿姨' },
-    { from: '父', to: '哥哥' }, { from: '母', to: '哥哥' },
-    { from: '父', to: '姐姐' }, { from: '母', to: '姐姐' },
-    { from: '父', to: '弟弟' }, { from: '母', to: '弟弟' },
-    { from: '父', to: '妹妹' }, { from: '母', to: '妹妹' },
-    { from: '伯父', to: '堂親' }, { from: '叔叔', to: '堂親' },
-    { from: '姑媽', to: '表親1' }, { from: '姑姐', to: '表親1' },
-    { from: '大舅', to: '表親2' }, { from: '小舅', to: '表親2' },
-    { from: '姨媽', to: '表親3' }, { from: '阿姨', to: '表親3' },
-    { from: '哥哥', to: '姪子' }, { from: '弟弟', to: '姪子' },
-    { from: '姐姐', to: '外甥' }, { from: '妹妹', to: '外甥' },
-    { from: '我', to: '子' },
-    { from: '我', to: '女' },
-  ];
-
-  const normalize = (s: string) => {
-    if (!s) return '';
-    return s
-      .replace(/爸爸/g, '父')
-      .replace(/媽媽/g, '母')
-      .replace(/哥哥/g, '兄')
-      .replace(/姐姐/g, '姐')
-      .replace(/姊姊/g, '姐')
-      .replace(/弟弟/g, '弟')
-      .replace(/妹妹/g, '妹')
-      .replace(/兒子/g, '子')
-      .replace(/女兒/g, '女')
-      .replace(/老婆/g, '妻')
-      .replace(/老公/g, '夫');
-  };
-
-  const FamilyTreeVisualizer = () => {
-    if (!showTree) return null;
-
-    const nQuery = normalize(query);
-    // 在「稱呼找關係」模式下，使用計算結果的第一條路徑作為高亮依據
-    const activeChain = mode === 'chain' 
-      ? nQuery 
-      : (result.length > 0 && result[0] !== '計算錯誤' ? normalize(result[0]) : '');
-
-    const getPaths = (node: any) => {
-      return [node.path, node.altPath, ...(node.extraPaths || [])].filter(Boolean).map(p => p.join('的'));
-    };
-    
-    const isNodeActive = (node: any) => {
-      if (node.id === '我') return true;
-      if (!activeChain) return false;
-
-      const nodePaths = getPaths(node);
-      
-      // 1. 節點本身在路徑中 (精確匹配或作為前綴)
-      const inPath = nodePaths.some(p => activeChain === p || activeChain.startsWith(p + '的'));
-      
-      if (inPath) return true;
-
-      // 2. 為了視覺連貫性，如果子孫節點在路徑中，祖先節點也應該亮起
-      const isAncestorOfActive = TREE_NODES.some(otherNode => {
-        if (otherNode.id === node.id) return false;
-        const otherPaths = getPaths(otherNode);
-        const otherActive = otherPaths.some(op => activeChain === op || activeChain.startsWith(op + '的'));
-        
-        if (!otherActive) return false;
-
-        // 檢查 node 是否是 otherNode 的路徑前綴
-        return nodePaths.some(p => otherPaths.some(op => op.startsWith(p + '的')));
-      });
-
-      return isAncestorOfActive;
-    };
-
-    const isTargetNode = (node: any) => {
-      if (!activeChain) return false;
-      const nodePaths = getPaths(node);
-      return nodePaths.some(p => activeChain === p);
-    };
-
-    const handleNodeClick = (node: any) => {
-      if (mode === 'chain') {
-        const path = node.path.join('的');
-        if (path) {
-          setQuery(path);
-          setShowTree(true);
-        } else if (node.id === '我') {
-          setQuery('');
-        }
-      } else {
-        if (node.searchTerm) {
-          setQuery(node.searchTerm);
-          setShowTree(true);
-        }
-      }
-    };
-
-    const isConnectionActive = (fromId: string, toId: string) => {
-      const fromNode = TREE_NODES.find(n => n.id === fromId);
-      const toNode = TREE_NODES.find(n => n.id === toId);
-      if (!fromNode || !toNode) return false;
-      return isNodeActive(fromNode) && isNodeActive(toNode);
-    };
-
-    return (
+const TreeNode = ({ node, active, target, onClick, isLarge }: { node: any; active: boolean; target: boolean; onClick: () => void; isLarge?: boolean }) => (
+  <motion.div
+    onClick={onClick}
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.95 }}
+    animate={{ 
+      scale: target ? 1.1 : 1,
+      backgroundColor: target ? '#10b981' : active ? '#3f3f46' : '#18181b',
+      borderColor: target ? '#34d399' : active ? '#52525b' : '#27272a'
+    }}
+    className={`
+      ${isLarge ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'}
+      border flex flex-col items-center justify-center transition-all duration-300 cursor-pointer
+      ${target ? 'text-white shadow-lg shadow-emerald-500/20' : active ? 'text-zinc-200' : 'text-zinc-600'}
+    `}
+  >
+    <span className={`${isLarge ? 'text-[10px]' : 'text-[8px]'} font-bold leading-none text-center px-1`}>{node.label}</span>
+    {target && active && (
       <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="w-0.5 h-0.5 rounded-full bg-white mt-0.5"
+      />
+    )}
+  </motion.div>
+);
+
+const FamilyTreeVisualizer = ({ 
+  show, 
+  query, 
+  mode, 
+  result, 
+  isTreeFullscreen, 
+  setIsTreeFullscreen, 
+  setQuery, 
+  setShowTree 
+}: { 
+  show: boolean; 
+  query: string; 
+  mode: string; 
+  result: string[]; 
+  isTreeFullscreen: boolean; 
+  setIsTreeFullscreen: (v: boolean) => void; 
+  setQuery: (v: string | ((p: string) => string)) => void; 
+  setShowTree: (v: boolean) => void; 
+}) => {
+  if (!show) return null;
+
+  const nQuery = normalize(query);
+  const activeChain = mode === 'chain' 
+    ? nQuery 
+    : (result.length > 0 && result[0] !== '計算錯誤' ? normalize(result[0]) : '');
+
+  // Pre-calculate active paths for performance
+  const activePathsSet = new Set<string>();
+  if (activeChain) {
+    const parts = activeChain.split('的');
+    let current = '';
+    parts.forEach((part, i) => {
+      current = current ? `${current}的${part}` : part;
+      activePathsSet.add(current);
+    });
+  }
+
+  const getPaths = (node: any) => {
+    return [node.path, node.altPath, ...(node.extraPaths || [])].filter(Boolean).map(p => p.join('的'));
+  };
+  
+  const isNodeActive = (node: any) => {
+    if (node.id === '我') return true;
+    if (!activeChain) return false;
+
+    const nodePaths = getPaths(node);
+    // If any of the node's paths are a prefix of the active chain
+    return nodePaths.some(p => activePathsSet.has(p));
+  };
+
+  const isTargetNode = (node: any) => {
+    if (!activeChain) return false;
+    const nodePaths = getPaths(node);
+    return nodePaths.some(p => activeChain === p);
+  };
+
+  const handleNodeClick = (node: any) => {
+    if (mode === 'chain') {
+      const path = node.path.join('的');
+      if (path) {
+        setQuery(path);
+        setShowTree(true);
+      } else if (node.id === '我') {
+        setQuery('');
+      }
+    } else {
+      if (node.searchTerm) {
+        setQuery(node.searchTerm);
+        setShowTree(true);
+      }
+    }
+  };
+
+  const isConnectionActive = (fromId: string, toId: string) => {
+    const fromNode = TREE_NODES.find(n => n.id === fromId);
+    const toNode = TREE_NODES.find(n => n.id === toId);
+    if (!fromNode || !toNode) return false;
+    return isNodeActive(fromNode) && isNodeActive(toNode);
+  };
+
+  return (
+    <>
+      {/* Placeholder to prevent layout jump when going fullscreen */}
+      {isTreeFullscreen && <div className="mt-6 h-[400px] w-full" />}
+      
+      <motion.div 
+        layout
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className={`
           ${isTreeFullscreen 
             ? 'fixed inset-0 z-50 bg-zinc-950 p-6 flex flex-col' 
             : 'mt-6 p-4 bg-zinc-900 rounded-3xl border border-zinc-800 shadow-inner relative min-h-[400px]'
           }
-          overflow-hidden transition-all duration-500
+          overflow-hidden
         `}
       >
         <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
@@ -348,6 +330,12 @@ export default function App() {
                   <div className="w-2 h-2 rounded-full bg-zinc-700" />
                   <span className="text-[10px] text-zinc-400">路徑</span>
                 </div>
+                <button 
+                  onClick={() => setQuery('')}
+                  className="px-2 py-1 rounded bg-zinc-800 text-[10px] text-zinc-400 hover:text-white transition-colors"
+                >
+                  重置
+                </button>
               </div>
             )}
             <button 
@@ -407,51 +395,94 @@ export default function App() {
           ))}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between items-center">
-          <div className="text-[9px] text-zinc-500 max-w-[60%] truncate">
-            {query || '選擇關係開始'}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-[9px] text-zinc-400">目標</span>
+        {!isTreeFullscreen && (
+          <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between items-center">
+            <div className="text-[9px] text-zinc-500 max-w-[60%] truncate">
+              {query || '選擇關係開始'}
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-              <span className="text-[9px] text-zinc-400">路徑</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[9px] text-zinc-400">目標</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+                <span className="text-[9px] text-zinc-400">路徑</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </motion.div>
-    );
+    </>
+  );
+};
+
+export default function App() {
+  const [query, setQuery] = useState<string>('');
+  const [result, setResult] = useState<string[]>([]);
+  const [gender, setGender] = useState<Gender>(1); // Default to male speaker
+  const [mode, setMode] = useState<'chain' | 'reverse'>('chain'); // chain: A的B, reverse: 稱呼A為什麼
+  const [showTaigi, setShowTaigi] = useState<boolean>(true);
+  const [inputMethod, setInputMethod] = useState<'buttons' | 'tree'>('buttons');
+  const [showTree, setShowTree] = useState<boolean>(false);
+  const [isTreeFullscreen, setIsTreeFullscreen] = useState<boolean>(false);
+  const [isCalculating, setIsCalculating] = useState<boolean>(false);
+
+  const handleAddRelation = (val: string) => {
+    setQuery(prev => prev ? `${prev}的${val}` : val);
+    setShowTree(false);
   };
 
-  const TreeNode = ({ node, active, target, onClick, isLarge }: { node: any; active: boolean; target: boolean; onClick: () => void; isLarge?: boolean }) => (
-    <motion.div
-      onClick={onClick}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      animate={{ 
-        scale: target ? 1.1 : 1,
-        backgroundColor: target ? '#10b981' : active ? '#3f3f46' : '#18181b',
-        borderColor: target ? '#34d399' : active ? '#52525b' : '#27272a'
-      }}
-      className={`
-        ${isLarge ? 'w-14 h-14 rounded-2xl' : 'w-10 h-10 rounded-xl'}
-        border flex flex-col items-center justify-center transition-all duration-300 cursor-pointer
-        ${target ? 'text-white shadow-lg shadow-emerald-500/20' : active ? 'text-zinc-200' : 'text-zinc-600'}
-      `}
-    >
-      <span className={`${isLarge ? 'text-[10px]' : 'text-[8px]'} font-bold leading-none text-center px-1`}>{node.label}</span>
-      {target && active && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="w-0.5 h-0.5 rounded-full bg-white mt-0.5"
-        />
-      )}
-    </motion.div>
-  );
+  const handleClear = () => {
+    setQuery('');
+    setResult([]);
+    setShowTree(false);
+  };
+
+  const handleBackspace = () => {
+    if (!query) return;
+    const parts = query.split('的');
+    parts.pop();
+    setQuery(parts.join('的'));
+    setShowTree(false);
+  };
+
+  const handleCalculate = () => {
+    if (result.length === 0) return;
+    setIsCalculating(true);
+    setShowTree(true);
+    setTimeout(() => setIsCalculating(false), 300);
+  };
+
+  const getTaigiInfo = (term: string) => {
+    return TAIGI_MAP[term] || null;
+  };
+
+  useEffect(() => {
+    if (!query) {
+      setResult([]);
+      return;
+    }
+
+    try {
+      const options = {
+        text: query,
+        sex: gender,
+        reverse: mode === 'reverse',
+        type: mode === 'chain' ? 'default' : 'chain'
+      };
+      const res = relationship(options);
+      if (Array.isArray(res)) {
+        setResult(res);
+      } else if (res) {
+        setResult([res]);
+      } else {
+        setResult([]);
+      }
+    } catch (e) {
+      setResult(['計算錯誤']);
+    }
+  }, [query, gender, mode]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-8">
@@ -591,14 +622,14 @@ export default function App() {
               >
                 {/* Top Row Actions */}
                 <button 
-                  onClick={() => { handleClear(); setShowTree(false); }}
+                  onClick={handleClear}
                   className="col-span-2 py-4 rounded-2xl bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-bold flex items-center justify-center gap-2 transition-colors"
                 >
                   <RotateCcw className="w-5 h-5" />
                   AC
                 </button>
                 <button 
-                  onClick={() => { handleBackspace(); setShowTree(false); }}
+                  onClick={handleBackspace}
                   className="col-span-2 py-4 rounded-2xl bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-bold flex items-center justify-center gap-2 transition-colors"
                 >
                   <Delete className="w-5 h-5" />
@@ -609,7 +640,7 @@ export default function App() {
                 {RELATION_BUTTONS.map((btn) => (
                   <button
                     key={btn.value}
-                    onClick={() => { handleAddRelation(btn.value); setShowTree(false); }}
+                    onClick={() => handleAddRelation(btn.value)}
                     className={`py-6 rounded-2xl text-xl font-bold transition-all active:scale-95 ${btn.color}`}
                   >
                     {btn.label}
@@ -632,9 +663,18 @@ export default function App() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
               >
-                <FamilyTreeVisualizer />
+                <FamilyTreeVisualizer 
+                  show={true}
+                  query={query}
+                  mode={mode}
+                  result={result}
+                  isTreeFullscreen={isTreeFullscreen}
+                  setIsTreeFullscreen={setIsTreeFullscreen}
+                  setQuery={setQuery}
+                  setShowTree={setShowTree}
+                />
                 <button 
-                  onClick={() => { handleClear(); }}
+                  onClick={handleClear}
                   className="w-full mt-4 py-3 rounded-2xl bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-bold flex items-center justify-center gap-2 transition-colors"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -644,7 +684,18 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {inputMethod === 'buttons' && <FamilyTreeVisualizer />}
+          {inputMethod === 'buttons' && (
+            <FamilyTreeVisualizer 
+              show={showTree}
+              query={query}
+              mode={mode}
+              result={result}
+              isTreeFullscreen={isTreeFullscreen}
+              setIsTreeFullscreen={setIsTreeFullscreen}
+              setQuery={setQuery}
+              setShowTree={setShowTree}
+            />
+          )}
         </div>
 
         {/* Footer Info */}
